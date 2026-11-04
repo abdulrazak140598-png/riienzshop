@@ -23,7 +23,6 @@ async function beli(){
   let idrAmount = sel.p;
   let modal = document.getElementById('payModal');
   modal.style.display = 'flex';
-  modal.innerHTML = `<div style="background:white;padding:20px;border-radius:16px;text-align:center">Membuat QR Rp ${idrAmount.toLocaleString('id-ID')}...</div>`;
   modal.innerHTML = `
 <div style="background:#fff;padding:0;border-radius:24px;text-align:center;max-width:380px;width:92%;margin:auto;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);font-family:system-ui">
   <!-- HEADER -->
@@ -32,6 +31,82 @@ async function beli(){
     <div style="font-weight:900;font-size:18px;margin-top:4px">${curGame} - ${sel.d}</div>
     <div style="font-size:12px;opacity:.9;margin-top:2px">ID: ${uid.value} ${document.getElementById('zid')?.value ? '('+document.getElementById('zid').value+')' : ''}</div>
   </div>
+  modal.innerHTML = '<div style="background:white;padding:20px;border-radius:16px;text-align:center">Membuat QR Rp ' + idrAmount.toLocaleString('id-ID') + '...</div>';
+
+  try{
+    const res = await fetch('/api/kipay-qr', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: idrAmount, note: curGame + ' | ' + sel.d + ' | ID:' + uid.value })
+    });
+    const data = await res.json();
+    if(!data.success || !data.qr_image){
+      modal.innerHTML = '<div style="background:white;padding:20px;border-radius:16px;text-align:center">Gagal, coba lagi<br><button id="btnTutup1" style="background:#eee;padding:10px 20px;border:0;border-radius:10px;margin-top:10px">Tutup</button></div>';
+      document.getElementById('btnTutup1').onclick = closePay;
+      return;
+    }
+
+    let zidVal = document.getElementById('zid') ? document.getElementById('zid').value : '';
+    let idText = uid.value + (zidVal ? ' (' + zidVal + ')' : '');
+    let totalText = data.total_amount.toLocaleString('id-ID');
+    let nominalText = data.nominal_diminta.toLocaleString('id-ID');
+    let kodeText = data.unique_code ? '+ Kode Unik ' + data.unique_code : '';
+
+    modal.innerHTML =
+    '<div style="background:#fff;padding:0;border-radius:24px;text-align:center;max-width:380px;width:92%;margin:auto;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35)">'+
+      '<div style="background:linear-gradient(135deg,#6d28d9,#a21caf);padding:18px 16px;color:#fff">'+
+        '<div style="font-size:11px;letter-spacing:2px;opacity:.8">TOPUP GAME - PEMBAYARAN QRIS</div>'+
+        '<div style="font-weight:900;font-size:18px;margin-top:4px">' + curGame + ' - ' + sel.d + '</div>'+
+        '<div style="font-size:12px;opacity:.9;margin-top:2px">ID: ' + idText + '</div>'+
+      '</div>'+
+      '<div style="padding:16px 16px 0">'+
+        '<div style="font-size:11px;color:#888">TOTAL BAYAR - BAYAR PERSIS SEGINI</div>'+
+        '<div style="font-size:32px;font-weight:900;margin-top:4px">Rp ' + totalText + '</div>'+
+        '<div style="font-size:11px;color:#a21caf;font-weight:700;margin-top:4px">Nominal Rp ' + nominalText + ' ' + kodeText + '</div>'+
+        '<div id="timerQr" style="display:inline-block;margin-top:10px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:800;padding:6px 12px;border-radius:999px">Berlaku 05:00</div>'+
+      '</div>'+
+      '<div style="padding:14px 16px 0"><div style="border:1.5px dashed #e9d5ff;border-radius:18px;padding:14px">'+
+        '<img src="' + data.qr_image + '" style="width:250px;height:250px;margin:auto;display:block" />'+
+        '<div style="font-size:11px;color:#666;margin-top:8px">Scan dengan aplikasi apa pun</div>'+
+      '</div></div>'+
+      '<div style="display:flex;justify-content:center;gap:6px;margin:14px 0 0;flex-wrap:wrap">'+
+        '<span style="background:#f3f4f6;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800">DANA</span>'+
+        '<span style="background:#f3f4f6;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800">OVO</span>'+
+        '<span style="background:#f3f4f6;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800">GoPay</span>'+
+        '<span style="background:#f3f4f6;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800">ShopeePay</span>'+
+        '<span style="background:#f3f4f6;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800">TNG</span>'+
+      '</div>'+
+      '<div style="text-align:left;background:#f9fafb;margin:14px 16px 0;padding:12px;border-radius:14px;font-size:12px;line-height:1.6;color:#374151">'+
+        '1. Buka DANA / OVO / GoPay / TNG<br>2. Pilih Scan / QRIS lalu scan QR di atas<br>3. Pastikan nominalnya <b>Rp ' + totalText + '</b> lalu Bayar'+
+      '</div>'+
+      '<div style="padding:14px 16px 16px;display:flex;gap:10px">'+
+        '<button id="btnSalin" style="flex:1;background:#111;color:#fff;border:0;padding:13px;border-radius:12px;font-weight:800">Salin Nominal</button>'+
+        '<button id="btnTutup" style="flex:1;background:#f3f4f6;border:0;padding:13px;border-radius:12px;font-weight:800">Tutup</button>'+
+      '</div>'+
+    '</div>';
+
+    document.getElementById('btnTutup').onclick = closePay;
+    document.getElementById('btnSalin').onclick = function(){
+      navigator.clipboard.writeText(String(data.total_amount));
+      this.innerText = 'Tersalin';
+    };
+
+    let sisa = 300;
+    let tEl = document.getElementById('timerQr');
+    let tInt = setInterval(function(){
+      sisa--;
+      if(!tEl){clearInterval(tInt);return;}
+      let m = String(Math.floor(sisa/60)).padStart(2,'0');
+      let s = String(sisa%60).padStart(2,'0');
+      tEl.innerText = 'Berlaku ' + m + ':' + s;
+      if(sisa<=0){clearInterval(tInt); tEl.innerText='QR Expired, tutup & buat lagi';}
+    },1000);
+
+  }catch(e){
+    modal.innerHTML = '<div style="background:white;padding:20px;border-radius:16px;text-align:center">Error: ' + String(e) + '<br><button id="btnTutup2" style="background:#eee;padding:10px 20px;border:0;border-radius:10px;margin-top:10px">Tutup</button></div>';
+    document.getElementById('btnTutup2').onclick = closePay;
+  }
+}
 
   <!-- HARGA -->
   <div style="padding:16px 16px 0">
