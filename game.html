@@ -16,52 +16,38 @@ function init(){let name=new URLSearchParams(location.search).get('game'); if(!n
 function render(){let g=gamesData[curGame]; let el=document.getElementById('list'); el.innerHTML=''; g.prices.forEach((it,i)=>{let pr=it.p*rates[cur].rate; let txt=cur==='IDR'?'Rp '+it.p.toLocaleString('id-ID'):rates[cur].sym+pr.toFixed(2); el.innerHTML+=`<div onclick="pilih(${i})" id="it${i}" class="item"><div class="d">${it.d}</div><div class="p">${txt}</div></div>`;});}
 function pilih(i){sel=gamesData[curGame].prices[i]; document.querySelectorAll('.item').forEach(e=>e.classList.remove('active')); document.getElementById('it'+i).classList.add('active'); let pr=sel.p*rates[cur].rate; total.innerText=cur==='IDR'?'Rp '+sel.p.toLocaleString('id-ID'):rates[cur].sym+pr.toFixed(2); btn.classList.add('on');}
 
-// ===== UDAH DITEMPEL - CUMA 1 BARIS INI YANG DIGANTI, LAINNYA SAMA PERSIS =====
-function beli(){
+async function beli(){
   if(!sel){alert('Pilih nominal dulu bang!');return;}
   if(!uid.value){alert('Isi ID Game dulu!');return;}
 
   let idrAmount = sel.p;
-  let converted = idrAmount * rates[cur].rate;
-  let displayPrice = cur==='IDR' ? idrAmount : converted.toFixed(2);
-  let displaySymbol = rates[cur].sym;
-
-  // FIX: kirim IDR asli (idrAmount), bukan displayPrice yang RM 116
-  // Tampilan tetap RM, tapi yang masuk ke KiPay tetap Rp 400.000
-  let kipayUrl = `${KIPAY_BASE_LINK}?amount=${idrAmount}&currency=IDR&game=${encodeURIComponent(curGame)}&uid=${encodeURIComponent(uid.value)}&zone=${encodeURIComponent(document.getElementById('zid')?.value||'')}&item=${encodeURIComponent(sel.d)}`;
-
   let modal = document.getElementById('payModal');
-  modal.style.display='flex';
+  modal.style.display = 'flex';
+  modal.innerHTML = `<div style="background:white;padding:20px;border-radius:16px;text-align:center">Membuat QR Rp ${idrAmount.toLocaleString('id-ID')}...</div>`;
+
+  // PAKAI FILE YANG UDAH ADA KEMARIN, JANGAN BIKIN BARU
+  const res = await fetch('/api/kipay-qr', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      amount: idrAmount,
+      note: `${curGame} | ${sel.d} | ID:${uid.value} (${document.getElementById('zid')?.value||''})`
+    })
+  });
+  const data = await res.json();
+  const trx_id = data.trx_id || data.data?.trx_id;
+  if(!trx_id){ modal.innerHTML = `<div style="background:white;padding:20px;border-radius:16px;text-align:center">Gagal: ${JSON.stringify(data).slice(0,200)}<div onclick="closePay()" style="background:#eee;padding:10px;border-radius:10px;margin-top:10px;cursor:pointer">Tutup</div></div>`; return; }
+
+  const APIKEY = "qpg_pub_OqY_WWOqe1uLHo3Zow-PeX4MHogpxWhe";
+  const qrUrl = `https://api.kipay.id/api/pay/${APIKEY}/transactions/${trx_id}/qr`;
+
   modal.innerHTML = `
-  <div style="background:white;padding:18px;border-radius:16px;text-align:center;max-width:380px;margin:auto;box-shadow:0 10px 30px rgba(0,0,0,.3)">
-    <div style="background:linear-gradient(135deg,#ffcd00,#ffb800);color:black;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:900;display:inline-block">KIPAY - ${cur} ${cur==='MYR'?'🇲🇾':cur==='IDR'?'🇮🇩':cur==='PHP'?'🇵🇭':cur==='SGD'?'🇸🇬':'🇹🇭'}</div>
-    <h2 style="margin:14px 0 4px;color:#111;font-size:28px">${displaySymbol}${displayPrice}</h2>
-    <p style="font-size:12px;color:#666;margin:0">≈ Rp ${idrAmount.toLocaleString('id-ID')} • ${sel.d}<br>Game: ${curGame} • ID: ${uid.value}</p>
-    
-    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px;margin:14px 0;text-align:left;font-size:12px;color:#111">
-      <div style="font-weight:800;margin-bottom:6px;color:#166534">✅ Bisa bayar pakai:</div>
-      <div>${cur==='MYR'?'🇲🇾 TNG eWallet • GrabPay • DuitNow QR • Maybank • CIMB • Boost':''}
-      ${cur==='IDR'?'🇮🇩 QRIS • DANA • OVO • GoPay • ShopeePay • LinkAja':''}
-      ${cur==='PHP'?'🇵🇭 GCash • Maya • QR Ph':''}
-      ${cur==='SGD'?'🇸🇬 PayNow • GrabPay SG':''}
-      ${cur==='THB'?'🇹🇭 PromptPay • TrueMoney':''}
-      </div>
-      <div style="margin-top:8px;background:white;border-radius:8px;padding:8px;font-size:11px">
-        <b>Total yang dibayar customer:</b><br>
-        <span style="font-size:16px;font-weight:900;color:#111">${displaySymbol}${displayPrice} ${cur}</span><br>
-        <span style="color:#666">QR nya muncul di halaman Kipay selanjutnya</span>
-      </div>
-    </div>
-
-    <a href="${kipayUrl}" target="_blank" style="display:block;background:#111;color:white;padding:16px;border-radius:12px;font-weight:900;text-decoration:none;font-size:15px">
-      🔗 BAYAR ${displaySymbol}${displayPrice} VIA KIPAY
-    </a>
-    <div style="margin-top:8px;font-size:10px;color:#888">Klik di atas, nanti kebuka halaman Kipay.id - QR asli DuitNow/QRIS ada di sana. Customer Malaysia tinggal scan pakai TNG langsung kepotong RM ${cur==='MYR'?displayPrice:'116.00'}</div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
-      <div onclick="closePay()" style="background:#eee;padding:12px;border-radius:10px;font-weight:700;cursor:pointer;text-align:center;color:#333">Tutup</div>
-      <div onclick="sudahBayar('${kipayUrl}','${displaySymbol}${displayPrice}')" style="background:linear-gradient(135deg,#25D366,#128C7E);color:white;padding:12px;border-radius:10px;font-weight:800;cursor:pointer;text-align:center">💬 WA Admin</div>
-    </div>
+  <div style="background:white;padding:18px;border-radius:16px;text-align:center;max-width:380px;width:100%;margin:auto">
+    <div style="font-weight:900">${curGame} - ${sel.d}</div>
+    <div style="font-size:12px;color:#666">ID: ${uid.value} • Total: Rp ${idrAmount.toLocaleString('id-ID')}</div>
+    <img src="${qrUrl}" style="width:280px;height:280px;margin:14px auto;display:block" />
+    <div style="background:#fef9c3;padding:10px;border-radius:10px;font-size:13px;font-weight:700">⏳ Scan pakai DANA / OVO / GoPay / TNG / GrabPay</div>
+    <div onclick="closePay()" style="background:#eee;padding:12px;border-radius:10px;margin-top:12px;cursor:pointer;font-weight:700">Tutup</div>
   </div>`;
 }
 
