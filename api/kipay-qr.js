@@ -1,39 +1,34 @@
+// api/kipay-qr.js - YANG BENER, QR DARI KIPAY LANGSUNG, BUKAN QR LINK
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  
-  try {
-    let amount = 400000;
-    if (req.method === 'POST') {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-      amount = body?.amount || amount;
-    } else if (req.query?.amount) {
-      amount = req.query.amount;
-    }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+  const { amount, note } = req.body;
+  const APIKEY = "qpg_pub_OqY_WWOqe1uLHo3Zow-PeX4MHogpxWhe";
 
-    const baseAmount = parseInt(amount);
-    const uniqueCode = Math.floor(Math.random()*90)+10;
-    const totalAmount = baseAmount + uniqueCode;
-    const payId = `ROAN${Date.now().toString().slice(-8)}`;
-    
-    const payLink = `https://topup-game-roan.vercel.app/pay?id=${payId}&amount=${totalAmount}`;
-    
-    // QR pakai server eksternal, jadi gak butuh library qrcode lagi
-    const qrImage = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(payLink)}&margin=10`;
+  // 1. Bikin transaksi dulu ke KiPay
+  const r = await fetch(`https://api.kipay.id/api/pay/${APIKEY}/transactions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({
+      apiKey: APIKEY,
+      amount: Number(amount),
+      order_id: 'order_' + Date.now(),
+      note: note || ''
+    })
+  });
+  const data = await r.json();
+  const trx_id = data.trx_id || data.data?.trx_id;
 
-    return res.status(200).json({
-      success: true,
-      total_amount: totalAmount,
-      nominal_diminta: baseAmount,
-      unique_code: uniqueCode,
-      product: 'Topup Game',
-      qr_image: qrImage,
-      qr_id: `QRIS-${payId}`,
-      pay_link: payLink
-    });
-  } catch(e){
-    return res.status(500).json({ success: false, error: e.message });
-  }
+  if (!trx_id) return res.status(200).json({ success: false, raw: data });
+
+  // 2. Ambil QR ASLI dari KiPay - ini yang bisa di-scan DANA
+  // Jangan pakai qrserver.com lagi!
+  const qr_image = `https://api.kipay.id/api/pay/${APIKEY}/transactions/${trx_id}/qr`;
+
+  return res.status(200).json({
+    success: true,
+    trx_id: trx_id,
+    nominal_diminta: Number(amount),
+    total_amount: Number(amount), // kalau mau pakai kode unik, hitung di sini
+    qr_image: qr_image
+  });
 }
