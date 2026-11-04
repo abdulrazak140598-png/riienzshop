@@ -16,7 +16,7 @@ function init(){let name=new URLSearchParams(location.search).get('game'); if(!n
 function render(){let g=gamesData[curGame]; let el=document.getElementById('list'); el.innerHTML=''; g.prices.forEach((it,i)=>{let pr=it.p*rates[cur].rate; let txt=cur==='IDR'?'Rp '+it.p.toLocaleString('id-ID'):rates[cur].sym+pr.toFixed(2); el.innerHTML+=`<div onclick="pilih(${i})" id="it${i}" class="item"><div class="d">${it.d}</div><div class="p">${txt}</div></div>`;});}
 function pilih(i){sel=gamesData[curGame].prices[i]; document.querySelectorAll('.item').forEach(e=>e.classList.remove('active')); document.getElementById('it'+i).classList.add('active'); let pr=sel.p*rates[cur].rate; total.innerText=cur==='IDR'?'Rp '+sel.p.toLocaleString('id-ID'):rates[cur].sym+pr.toFixed(2); btn.classList.add('on');}
 
-// ===== FIX KIPAY ASLI - BISA MALAYSIA SCAN BAYAR RM 116.00 LANGSUNG =====
+// ===== UDAH DITEMPEL - CUMA 1 BARIS INI YANG DIGANTI, LAINNYA SAMA PERSIS =====
 function beli(){
   if(!sel){alert('Pilih nominal dulu bang!');return;}
   if(!uid.value){alert('Isi ID Game dulu!');return;}
@@ -26,8 +26,9 @@ function beli(){
   let displayPrice = cur==='IDR' ? idrAmount : converted.toFixed(2);
   let displaySymbol = rates[cur].sym;
 
-  // Link Kipay asli abang - support cross-border
-  let kipayUrl = `${KIPAY_BASE_LINK}?amount=${displayPrice}&currency=${cur}&game=${encodeURIComponent(curGame)}&uid=${encodeURIComponent(uid.value)}&zone=${encodeURIComponent(document.getElementById('zid')?.value||'')}&item=${encodeURIComponent(sel.d)}`;
+  // FIX: kirim IDR asli (idrAmount), bukan displayPrice yang RM 116
+  // Tampilan tetap RM, tapi yang masuk ke KiPay tetap Rp 400.000
+  let kipayUrl = `${KIPAY_BASE_LINK}?amount=${idrAmount}&currency=IDR&game=${encodeURIComponent(curGame)}&uid=${encodeURIComponent(uid.value)}&zone=${encodeURIComponent(document.getElementById('zid')?.value||'')}&item=${encodeURIComponent(sel.d)}`;
 
   let modal = document.getElementById('payModal');
   modal.style.display='flex';
